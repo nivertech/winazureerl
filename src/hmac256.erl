@@ -3,7 +3,7 @@
 %%% Author  :  Sriram Krishnan<mail@sriramkrishnan.com>
 %%% Description : HMAC-SHA256 implementation. Implementation based on Wikipedia's
 %% pseudocode description of HMAC.  Relies on Steve Vinoski's SHA256 implementation
-%%% from http://steve.vinoski.net/code/sha256.erl
+%%% from http://steve.vinoski.net/code/sha2.erl
 %%%
 %%% Created : 30 Dec 2008
 %%%-------------------------------------------------------------------
@@ -30,7 +30,7 @@ digest(Key, Data, Hex) ->
     
     %% If key is longer than block size, hash it to bring it below block size
     if
-	length(Key)>BlockSize -> ShortHashKey = array:from_list(sha256:digest(Key));
+	length(Key)>BlockSize -> ShortHashKey = array:from_list(unhex(sha2:digest256(Key),[]));
 	true-> ShortHashKey = array:from_list(Key) 
     end,
     
@@ -50,13 +50,34 @@ digest(Key, Data, Hex) ->
     OPadUpdated = array:map(PadUpdateFunc, OPad),
     IPadUpdated = array:map(PadUpdateFunc, IPad),
     
-    FinalTransform = OPadUpdated:to_list() ++ sha256:digest( IPadUpdated:to_list() ++ Data),
+    FinalTransform = OPadUpdated:to_list() ++ unhex(sha2:digest256( IPadUpdated:to_list() ++ Data),[]),
     
     if
-	Hex =:= true -> sha256:hexdigest(FinalTransform);
-	Hex=:= false -> sha256:digest( FinalTransform)
+	Hex =:= true -> sha2:digest256(FinalTransform);
+	Hex=:= false -> unhex(sha2:digest256( FinalTransform),[])
     end.
 
+%%
+%% Unhex functions adapted from ssl_debug and covered by the Erlang public license
+%%
+is_hex_digit(C) when C >= $0, C =< $9 -> true;
+is_hex_digit(C) when C >= $A, C =< $F -> true;
+is_hex_digit(C) when C >= $a, C =< $f -> true;
+is_hex_digit(_) -> false.
+
+unhex([], Acc) ->
+    lists:reverse(Acc);
+unhex([_], Acc) ->
+    unhex([], Acc);
+unhex([$  | Tl], Acc) ->
+    unhex(Tl, Acc);
+unhex([D1, D2 | Tl], Acc) ->
+    case {is_hex_digit(D1), is_hex_digit(D2)} of
+        {true, true} ->
+            unhex(Tl, [erlang:list_to_integer([D1, D2], 16) | Acc]);
+        _ ->
+            unhex([], Acc)
+    end.
 
 
 
